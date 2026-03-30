@@ -3,11 +3,13 @@ let gl;
 let program;
 let vao;
 
-let offsetLoc;
 let colorLoc;
 
-const squareSize = 150;
-const borderLength = 50;
+let showWireframe = false;
+
+const inSS = 200;
+const outSS = 400;
+const bL = 100;
 
 // ================= MAIN =================
 function main() {
@@ -21,6 +23,7 @@ function main() {
 
     setupShaders();
     setupBuffers();
+    setupEvents();
     draw();
 }
 
@@ -28,15 +31,9 @@ function main() {
 function setupShaders() {
     const vs = `#version 300 es
     in vec2 position;
-    uniform vec2 offset;
 
     void main() {
-        vec2 pos = position + offset;
-
-        // convert to clip space (-1 to 1)
-        vec2 clip = (pos / 300.0) - 1.0;
-
-        // invert Y axis
+        vec2 clip = (position / 300.0) - 1.0;
         gl_Position = vec4(clip * vec2(1, -1), 0, 1);
     }`;
 
@@ -59,7 +56,6 @@ function setupShaders() {
     gl.linkProgram(program);
     gl.useProgram(program);
 
-    offsetLoc = gl.getUniformLocation(program, "offset");
     colorLoc = gl.getUniformLocation(program, "color");
 }
 
@@ -72,11 +68,13 @@ function createShader(type, source) {
 
 // ================= BUFFERS =================
 function setupBuffers() {
-    const size = squareSize;
-
+    // quadrado externo e interno intercalados
     const vertices = new Float32Array([
-        0,0,  size,0,  0,size,
-        0,size, size,0, size,size
+        bL,bL,              bL+(outSS-inSS)/2,bL+(outSS-inSS)/2,
+        bL+outSS,bL,        bL+(outSS-inSS)/2+inSS,bL+(outSS-inSS)/2,
+        bL+outSS,bL+outSS,  bL+(outSS-inSS)/2+inSS,bL+(outSS-inSS)/2+inSS,
+        bL,bL+outSS,        bL+(outSS-inSS)/2,bL+(outSS-inSS)/2+inSS,
+        bL,bL,              bL+(outSS-inSS)/2,bL+(outSS-inSS)/2
     ]);
 
     vao = gl.createVertexArray();
@@ -91,28 +89,14 @@ function setupBuffers() {
     gl.vertexAttribPointer(posLoc, 2, gl.FLOAT, false, 0, 0);
 }
 
-// ================= DATA =================
-function createSquares() {
-    const colors = [
-        [0,0,1,1],[0,1,0,1],[0,1,1,1],
-        [1,0,0,1],[1,0,1,1],[1,1,0,1],
-        [0.5,0,0.5,1],[0.5,0.5,0.5,1],[0.5,1,0.5,1]
-    ];
-
-    const squares = [];
-    let k = 0;
-
-    for (let i = 0; i < 3; i++) {
-        for (let j = 0; j < 3; j++) {
-            squares.push({
-                x: borderLength + j * (squareSize+(600-3*squareSize-2*borderLength)/2),
-                y: borderLength + i * (squareSize+(600-3*squareSize-2*borderLength)/2),
-                color: colors[k++]
-            });
+// ================= EVENTS =================
+function setupEvents() {
+    document.addEventListener("keydown", e => {
+        if (e.key === "c") {
+            showWireframe = !showWireframe;
+            draw();
         }
-    }
-
-    return squares;
+    });
 }
 
 // ================= DRAW =================
@@ -122,11 +106,13 @@ function draw() {
 
     gl.bindVertexArray(vao);
 
-    const squares = createSquares();
+    // preenchido (azul)
+    gl.uniform4f(colorLoc, 0,1,0,1);
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 10);
 
-    squares.forEach(s => {
-        gl.uniform2f(offsetLoc, s.x, s.y);
-        gl.uniform4fv(colorLoc, s.color);
-        gl.drawArrays(gl.TRIANGLES, 0, 6);
-    });
+    // contorno
+    if (showWireframe) {
+        gl.uniform4f(colorLoc, 0,0,0,1);
+        gl.drawArrays(gl.LINE_STRIP, 0, 10);
+    }
 }
